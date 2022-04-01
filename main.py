@@ -630,3 +630,291 @@ if __name__ == '__main__':
     spider=LinajiaSpider()
     spider.run()
 
+
+#coding:utf8
+import requests
+import time
+import random
+import re
+import json
+from ua_info import ua_list
+class DoubanSpider(object):
+    def __init__(self):
+        self.url = 'https://movie.douban.com/j/chart/top_list?'
+        self.i = 0
+    # 获取随机headers
+    def get_headers(self):
+        headers = {'User-Agent':random.choice(ua_list)}
+        return headers
+    # 获取页面
+    def get_page(self,params):
+      # 将json转换为 python 数据类型，并返回
+      html = requests.get(url=self.url,params=params,headers=self.get_headers()).text
+      html=json.loads(html)
+      self.parse_page(html)
+    # 解析并保存数据
+    def parse_page(self,html):
+       item = {}
+        # html列表类型： [{电影1},{电影2},{电影3}...]
+       for one in html:
+            # 名称 + 评分
+           item['name'] = one['title'].strip()
+           item['score'] = float(one['score'].strip())
+           print(item)
+           self.i += 1
+    # 获取电影总数
+    def total_number(self,type_number):
+        # F12抓包抓到的地址，type表示电影类型
+        url = 'https://movie.douban.com/j/chart/top_list_count?type={}&interval_id=100%3A90'.format(type_number)
+        headers = self.get_headers()
+        html = requests.get(url=url,headers=headers).json()
+        total = int(html['total'])
+        return total
+    # 获取所有电影的类型和对应type值
+    def get_all_type_films(self):
+        # 获取类型与类型码
+        url = 'https://movie.douban.com/chart'
+        headers = self.get_headers()
+        html = requests.get(url=url,headers=headers).text
+        re_bds = r'<a href=.*?type_name=(.*?)&type=(.*?)&.*?</a>'
+        pattern = re.compile(re_bds,re.S)
+        r_list = pattern.findall(html)
+        # 存放所有类型和对应类型码大字典
+        type_dict = {}
+        #定义一个选择电影类型的菜单
+        menu = ''
+        for r in r_list:
+            type_dict[r[0].strip()] = r[1].strip()
+            # 获取input的菜单，显示所有电影类型
+            menu += r[0].strip() + '|'
+        return type_dict,menu
+    # 主程序入口函数
+    def main(self):
+        # 获取type的值
+        type_dict,menu = self.get_all_type_films()
+        menu = menu + '\n你想了解什么类型电影:'
+        name = input(menu)
+        type_number = type_dict[name]
+        # 获取电影总数
+        total = self.total_number(type_number)
+        for start in range(0,(total+1),20):
+           #构建查询参数
+            params = {
+                'type' : type_number,
+                'interval_id' : '100:90',
+                'action' : '',
+                'start' : str(start),
+                'limit' : '20'
+            }
+            # 调用函数,传递params参数
+            self.get_page(params)
+            # 随机休眠1-3秒
+            time.sleep(random.randint(1,3))
+        print('电影总数量:%d部'%self.i )
+if __name__ == '__main__':
+    spider = DoubanSpider()
+    spider.main()
+
+# coding:utf8
+import json
+#JOSN字符串
+website_info='{"name" : "c语言中文网","PV" : "50万","UV" : "20万","create_time" : "2010年"}'
+py_dict=json.loads(website_info)
+print("python字典数据格式：%s；数据类型：%s"% (py_dict,type(py_dict)))
+
+
+#coding:utf8
+html_doc = """
+<html><head><title>"c语言中文网"</title></head>
+<body>
+<p class="title"><b>c.biancheng.net</b></p>
+<p class="website">一个学习编程的网站
+<a href="http://c.biancheng.net/python/" id="link1">python教程</a>
+<a href="http://c.biancheng.net/c/" id="link2">c语言教程</a>
+"""
+from bs4 import BeautifulSoup
+soup = BeautifulSoup(html_doc, 'html.parser')
+#prettify()用于格式化输出html/xml文档
+print(soup.prettify())
+
+
+#下载小说
+import urllib.request
+import random
+from bs4 import BeautifulSoup
+import time
+def request_html(url):
+    headers={'User-Agent':'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/89.0.4389.90 Safari/537.36'}
+    request = urllib.request.Request(url, headers=headers)
+    return request
+def parse_html(html, f):
+    # 生成soup对象
+    soup = BeautifulSoup(html, 'lxml')
+    # 查找所有的章节链接和标题内容
+    list_name = soup.select('.book-mulu > ul > li > a')
+    # 遍历每一个列表中的tag对象，获取链接个目录
+    for item in list_name:
+        # 获取链接
+        #item: <a href="/book/liangjinyanyi/1.html">自序</a>
+        #拼接目录链接,此处item类型为<class 'bs4.element.Tag'>，使用下面方法可以值获取href属性值
+        href = 'http://www.shicimingju.com' + item['href']
+        # 获取标题
+        title = item.text
+        print('正在下载:-**--%s--**-......' % title)
+        # 获取章节内容函数
+        text = get_text(href)
+        # 写入文件
+        f.write(title + '\n' + text)
+        print('结束下载:-**--%s--**-' % title)
+        time.sleep(random.uniform(0,1))
+# 提取章节内容
+def get_text(href):
+    #创建请求对象
+    request = request_html(href)
+    content = urllib.request.urlopen(request).read().decode('utf8')
+    soup = BeautifulSoup(content, 'lxml')
+    # 查找包含内容的tag--div
+    artist = soup.find('div', class_='chapter_content')
+    #获取tag标签中的文本内容
+    return artist.text
+def run():
+    # 打开文件
+    f = open('两晋演义.txt', 'w', encoding='utf8')
+    url = 'http://www.shicimingju.com/book/liangjinyanyi.html'
+    # 构建请求对象
+    request = request_html(url)
+    # 发送请求，得到响应，转换为HTML对象
+    html = urllib.request.urlopen(request).read().decode('utf8')
+    # 解析内容
+    parse_html(html,f)
+    #关闭文件
+    f.close()
+if __name__ == '__main__':
+    run()
+
+# 导入seleinum webdriver接口
+from selenium import webdriver
+import time
+# 创建Chrome浏览器对象
+browser = webdriver.Chrome()
+#访问百度网站
+browser.get('http://www.baidu.com/')
+#阻塞3秒
+time.sleep(3)
+# 自动退出浏览器
+browser.quit()
+
+from selenium import webdriver
+driver = webdriver.Chrome()
+driver.get("http://www.baidu.com")
+#参数数字为像素点
+driver.set_window_size(480, 800)
+#设置窗口位置
+driver.set_window_position(100,200)
+#同时设置窗口的大小和坐标
+driver.set_window_rect(450,300,32,50)
+#退出浏览器
+driver.quit()
+
+from selenium import webdriver
+driver = webdriver.Chrome()
+# 访问C语言中文网首页
+first_url= 'http://c.biancheng.net'
+driver.get(first_url)
+# 访问c语言教程
+second_url='http://c.biancheng.net/c/'
+driver.get(second_url)
+# 返回（后退）到c语言中文网首页
+driver.back()
+# 前进到C语言教程页
+driver.forward()
+# 刷新当前页面相当于F5
+driver.refresh()
+# 退出/关闭浏览器
+driver.quit()
+
+from selenium import webdriver
+import time
+options=webdriver.ChromeOptions()
+options.add_argument('--headless')#无界面浏览
+driver=webdriver.Chrome(options=options)
+driver.get('https://www.baidu.com')
+kw1=driver.find_element_by_id('kw')
+print(driver.title)
+time.sleep(3)
+#关闭当前界面，只有一个窗口
+driver.close()
+#关闭所有界面
+driver.quit()
+
+from selenium import webdriver
+from time import sleep
+# 访问百度
+driver=webdriver.Chrome()
+driver.get("http://www.baidu.com")
+# 最大化浏览器窗口
+driver.maximize_window()
+# 搜索
+driver.find_element_by_id("kw").send_keys("C语言中文网")
+driver.find_element_by_id("su").click()
+sleep(3)
+# 通过js代码设置滚动条位置，数值代表(左边距，上边距)
+js="window.scrollTo(100,500);"
+#执行js代码
+driver.execute_script(js)
+sleep(5)
+driver.quit()
+
+#coding:utf8
+from selenium import webdriver
+import time
+import pymongo
+class JdSpider(object):
+    def __init__(self):
+        self.url='http://www.jd.com/'
+        self.options=webdriver.ChromeOptions() # 无头模式
+        self.options.add_argument('--headless')
+        self.browser=webdriver.Chrome(options=self.options) # 创建无界面参数的浏览器对象
+        self.i=0  #计数，一共有多少件商品
+        #输入地址+输入商品+点击按钮，切记这里元素节点是京东首页的输入栏、搜索按钮
+    def get_html(self):
+        self.browser.get(self.url)
+        self.browser.find_element_by_xpath('//*[@id="key"]').send_keys('python书籍')
+        self.browser.find_element_by_xpath("//*[@class='form']/button").click()
+        #把进度条件拉倒最底部+提取商品信息
+    def get_data(self):
+        # 执行js语句，拉动进度条件
+        self.browser.execute_script(
+            'window.scrollTo(0,document.body.scrollHeight)'
+        )
+        # 给页面元素加载时预留时间
+        time.sleep(2)
+        #用 xpath 提取每页中所有商品，最终形成一个大列表
+        li_list=self.browser.find_elements_by_xpath('//*[@id="J_goodsList"]/ul/li')
+        for li in li_list:
+            #构建空字典
+            item={}
+            item['name']=li.find_element_by_xpath('.//div[@class="p-name"]/a/em').text.strip()
+            item['price']=li.find_element_by_xpath('.//div[@class="p-price"]').text.strip()
+            item['count']=li.find_element_by_xpath('.//div[@class="p-commit"]/strong').text.strip()
+            item['shop']=li.find_element_by_xpath('.//div[@class="p-shopnum"]').text.strip()
+            print(item)
+            self.i+=1
+    def run(self):
+        #搜索出想要抓取商品的页面
+        self.get_html()
+        #循环执行点击“下一页”操作
+        while True:
+            #获取每一页要抓取的数据
+            self.get_data()
+            #判断是否是最一页
+            if self.browser.page_source.find('pn-next disabled')==-1:
+                self.browser.find_element_by_class_name('pn-next').click()
+                #预留元素加载时间
+                time.sleep(1)
+            else:
+                print('数量',self.i)
+                break
+if __name__ == '__main__':
+    spider=JdSpider()
+    spider.run()
